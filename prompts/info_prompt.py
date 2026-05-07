@@ -1,0 +1,1 @@
+"""Candidate information prompt placeholder."""
