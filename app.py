@@ -30,6 +30,16 @@ LOCATION_COLLECTION_STAGE = "collect_current_location"
 TECH_STACK_COLLECTION_STAGE = "collect_tech_stack"
 COMPLETED_CONVERSATION_STAGE = "completed"
 COMPLETED_CONVERSATION_NOTICE = "Conversation closed. Use Reset conversation to start again."
+PROGRESS_STEPS = (
+    (INITIAL_CONVERSATION_STAGE, "Greeting"),
+    (EMAIL_COLLECTION_STAGE, "Email"),
+    (PHONE_COLLECTION_STAGE, "Phone"),
+    (EXPERIENCE_COLLECTION_STAGE, "Experience"),
+    (ROLE_COLLECTION_STAGE, "Role"),
+    (LOCATION_COLLECTION_STAGE, "Location"),
+    (TECH_STACK_COLLECTION_STAGE, "Tech Stack"),
+    (COMPLETED_CONVERSATION_STAGE, "Questions"),
+)
 CANDIDATE_FIELDS = (
     "full_name",
     "email",
@@ -258,6 +268,20 @@ def get_conversation_turn_count() -> int:
     )
 
 
+def get_progress_step_index(stage: str | None = None) -> int:
+    """Return the current progress-step index for the conversation stage."""
+    current_stage = stage or st.session_state.conversation_stage
+    for index, (step_stage, _) in enumerate(PROGRESS_STEPS):
+        if current_stage == step_stage:
+            return index
+    return 0
+
+
+def get_progress_percentage() -> int:
+    """Return completion percentage for the guided screening flow."""
+    return int(((get_progress_step_index() + 1) / len(PROGRESS_STEPS)) * 100)
+
+
 def get_flat_technologies(tech_stack: dict[str, list[str]]) -> list[str]:
     """Flatten the structured tech stack into a de-duplicated list."""
     seen: set[str] = set()
@@ -325,6 +349,297 @@ def parse_tech_stack_input(user_input: str) -> dict[str, list[str]]:
 def get_chat_input_placeholder() -> str:
     """Return a stage-aware placeholder for the chat input."""
     return get_stage_input_placeholder(st.session_state.conversation_stage)
+
+
+def get_chat_avatar(role: str) -> str:
+    """Return the avatar icon used for each chat role."""
+    if role == "assistant":
+        return ":material/smart_toy:"
+    return ":material/person:"
+
+
+def inject_custom_css() -> None:
+    """Apply custom styling for the TalentScout interface."""
+    st.markdown(
+        """
+        <style>
+        :root {
+            --ts-ink: #1f2933;
+            --ts-muted: #5f6c7b;
+            --ts-surface: rgba(255, 252, 246, 0.92);
+            --ts-line: rgba(175, 122, 57, 0.18);
+            --ts-accent: #bf6b2c;
+            --ts-accent-deep: #8d4f1f;
+            --ts-success: #23655b;
+            --ts-shadow: 0 18px 48px rgba(68, 47, 30, 0.10);
+            --ts-heading: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+            --ts-body: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+
+        html, body, [class*="css"] {
+            font-family: var(--ts-body);
+            color: var(--ts-ink);
+        }
+
+        div[data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at top left, rgba(255, 210, 158, 0.24), transparent 30%),
+                radial-gradient(circle at top right, rgba(120, 183, 172, 0.20), transparent 28%),
+                linear-gradient(180deg, #fffdf8 0%, #f8f2e9 52%, #f4ece2 100%);
+        }
+
+        div[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, rgba(255, 250, 242, 0.97) 0%, rgba(246, 238, 227, 0.97) 100%);
+            border-right: 1px solid var(--ts-line);
+        }
+
+        div[data-testid="stHeader"] {
+            background: rgba(255, 255, 255, 0);
+        }
+
+        div[data-testid="stMainBlockContainer"] {
+            max-width: 1080px;
+            padding-top: 2.2rem;
+            padding-bottom: 3rem;
+        }
+
+        h1, h2, h3 {
+            font-family: var(--ts-heading);
+            letter-spacing: -0.02em;
+            color: #1f2a33;
+        }
+
+        div[data-testid="stMetric"] {
+            background: var(--ts-surface);
+            border: 1px solid var(--ts-line);
+            border-radius: 20px;
+            padding: 0.85rem 1rem;
+            box-shadow: var(--ts-shadow);
+        }
+
+        div[data-testid="stMetric"] label {
+            color: var(--ts-muted);
+        }
+
+        div[data-testid="stChatMessage"] {
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(191, 107, 44, 0.10);
+            border-radius: 24px;
+            box-shadow: 0 8px 28px rgba(67, 52, 39, 0.06);
+            padding: 0.35rem 0.45rem;
+            backdrop-filter: blur(2px);
+        }
+
+        div[data-testid="stChatInput"] {
+            background: rgba(255, 251, 245, 0.94);
+            border: 1px solid rgba(191, 107, 44, 0.16);
+            border-radius: 999px;
+            padding: 0.2rem 0.55rem;
+            box-shadow: 0 14px 30px rgba(77, 55, 36, 0.10);
+        }
+
+        div[data-testid="stButton"] button {
+            border-radius: 999px;
+            border: 1px solid rgba(191, 107, 44, 0.18);
+            background: linear-gradient(135deg, #fff7ee 0%, #f6debe 100%);
+            color: var(--ts-accent-deep);
+        }
+
+        .ts-hero-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            border: 1px solid var(--ts-line);
+            background: linear-gradient(135deg, rgba(255, 250, 243, 0.97) 0%, rgba(245, 234, 219, 0.95) 100%);
+            box-shadow: var(--ts-shadow);
+            padding: 1.35rem 1.45rem;
+            margin-bottom: 1rem;
+        }
+
+        .ts-hero-card::after {
+            content: "";
+            position: absolute;
+            inset: auto -3rem -4rem auto;
+            width: 12rem;
+            height: 12rem;
+            background: radial-gradient(circle, rgba(191, 107, 44, 0.17), transparent 70%);
+        }
+
+        .ts-kicker {
+            display: inline-block;
+            font-size: 0.76rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--ts-accent-deep);
+            background: rgba(191, 107, 44, 0.10);
+            border: 1px solid rgba(191, 107, 44, 0.14);
+            border-radius: 999px;
+            padding: 0.28rem 0.7rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .ts-hero-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.9fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .ts-hero-copy h3 {
+            margin: 0 0 0.35rem 0;
+            font-size: 1.55rem;
+        }
+
+        .ts-hero-copy p, .ts-sidebar-card p {
+            margin: 0;
+            color: var(--ts-muted);
+            line-height: 1.55;
+        }
+
+        .ts-stage-summary {
+            display: grid;
+            gap: 0.65rem;
+        }
+
+        .ts-stage-box {
+            background: var(--ts-surface);
+            border: 1px solid var(--ts-line);
+            border-radius: 18px;
+            padding: 0.85rem 0.95rem;
+        }
+
+        .ts-stage-box span {
+            display: block;
+            font-size: 0.74rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--ts-muted);
+            margin-bottom: 0.18rem;
+        }
+
+        .ts-stage-box strong {
+            font-size: 1.02rem;
+            color: #22313b;
+        }
+
+        .ts-progress-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            margin-bottom: 1rem;
+        }
+
+        .ts-progress-step {
+            border-radius: 999px;
+            border: 1px solid var(--ts-line);
+            padding: 0.42rem 0.72rem;
+            background: rgba(255, 255, 255, 0.62);
+            color: var(--ts-muted);
+            font-size: 0.86rem;
+        }
+
+        .ts-progress-step.is-complete {
+            background: rgba(35, 101, 91, 0.10);
+            border-color: rgba(35, 101, 91, 0.22);
+            color: var(--ts-success);
+        }
+
+        .ts-progress-step.is-active {
+            background: linear-gradient(135deg, #f7d7b7 0%, #f0ba87 100%);
+            border-color: rgba(191, 107, 44, 0.28);
+            color: #663818;
+            font-weight: 600;
+        }
+
+        .ts-sidebar-card {
+            border-radius: 22px;
+            border: 1px solid var(--ts-line);
+            background: linear-gradient(180deg, rgba(255, 250, 243, 0.96) 0%, rgba(249, 239, 226, 0.96) 100%);
+            padding: 1rem;
+            box-shadow: 0 12px 28px rgba(77, 55, 36, 0.08);
+            margin-bottom: 1rem;
+        }
+
+        .ts-sidebar-card h3 {
+            margin: 0.2rem 0 0.3rem 0;
+            font-size: 1.3rem;
+        }
+
+        @media (max-width: 900px) {
+            .ts-hero-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero_panel() -> None:
+    """Render the branded hero card at the top of the page."""
+    st.markdown(
+        f"""
+        <div class="ts-hero-card">
+            <div class="ts-kicker">TalentScout Hiring Desk</div>
+            <div class="ts-hero-layout">
+                <div class="ts-hero-copy">
+                    <h3>Structured screening with local AI support.</h3>
+                    <p>
+                        Move through the candidate journey one prompt at a time, preserve
+                        conversation context, and generate targeted technical questions from the
+                        declared stack.
+                    </p>
+                </div>
+                <div class="ts-stage-summary">
+                    <div class="ts-stage-box">
+                        <span>Current Stage</span>
+                        <strong>{get_stage_label(st.session_state.conversation_stage)}</strong>
+                    </div>
+                    <div class="ts-stage-box">
+                        <span>Flow Progress</span>
+                        <strong>{get_progress_percentage()}% complete</strong>
+                    </div>
+                    <div class="ts-stage-box">
+                        <span>Captured Signals</span>
+                        <strong>{get_collected_candidate_fields_count()} fields, {len(get_flat_technologies(st.session_state.tech_stack))} technologies</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_progress_strip() -> None:
+    """Render a visual stage-by-stage progress indicator."""
+    current_index = get_progress_step_index()
+    steps_markup: list[str] = []
+
+    for index, (_, label) in enumerate(PROGRESS_STEPS):
+        css_class = "ts-progress-step"
+        if index < current_index:
+            css_class += " is-complete"
+        elif index == current_index:
+            css_class += " is-active"
+        steps_markup.append(f'<span class="{css_class}">{label}</span>')
+
+    st.markdown(
+        f'<div class="ts-progress-strip">{"".join(steps_markup)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_summary_metrics() -> None:
+    """Render compact summary metrics for the current screening session."""
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Progress", f"{get_progress_percentage()}%")
+    with col2:
+        st.metric("Fields Captured", f"{get_collected_candidate_fields_count()}/{len(CANDIDATE_FIELDS)}")
+    with col3:
+        st.metric("Conversation Turns", str(get_conversation_turn_count()))
 
 
 def extract_json_object(raw_response: str) -> dict[str, object]:
@@ -487,7 +802,17 @@ def process_user_message(user_message: str, service: LLMService) -> str:
 def render_sidebar(service: LLMService | None, service_error: str | None) -> None:
     """Render the sidebar controls and configuration summary."""
     with st.sidebar:
-        st.header("Session")
+        st.markdown(
+            """
+            <div class="ts-sidebar-card">
+                <div class="ts-kicker">TalentScout</div>
+                <h3>Screening Console</h3>
+                <p>Track candidate progress, preserve context, and drive a guided hiring conversation from one workspace.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.subheader("Session")
         st.write("Use this chat to collect candidate details and generate technical questions.")
 
         if service is not None:
@@ -513,13 +838,14 @@ def render_sidebar(service: LLMService | None, service_error: str | None) -> Non
 def render_chat_history() -> None:
     """Render all visible chat messages."""
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+        with st.chat_message(message["role"], avatar=get_chat_avatar(message["role"])):
             st.markdown(message["content"])
 
 
 def main() -> None:
     """Run the Streamlit app."""
     st.set_page_config(page_title=APP_TITLE, layout="centered")
+    inject_custom_css()
     st.title(APP_TITLE)
     st.caption(APP_SUBTITLE)
 
@@ -532,6 +858,9 @@ def main() -> None:
     except Exception as exc:
         service_error = str(exc)
 
+    render_hero_panel()
+    render_progress_strip()
+    render_summary_metrics()
     render_sidebar(service, service_error)
     render_chat_history()
 
