@@ -100,6 +100,7 @@ def create_initial_session_values() -> dict[str, object]:
     """Create the initial session state used by the app."""
     return {
         "messages": create_initial_messages(),
+        "conversation_history": create_initial_messages(),
         "candidate_data": create_initial_candidate_data(),
         "conversation_stage": INITIAL_CONVERSATION_STAGE,
         "tech_stack": create_initial_tech_stack(),
@@ -139,6 +140,22 @@ def get_stage_label(stage: str) -> str:
 def get_collected_candidate_fields_count() -> int:
     """Return how many candidate fields currently have values."""
     return sum(1 for value in st.session_state.candidate_data.values() if value)
+
+
+def append_conversation_message(role: str, content: str) -> None:
+    """Append a message to both the UI messages and the stored conversation history."""
+    message = {"role": role, "content": content}
+    st.session_state.messages.append(message)
+    st.session_state.conversation_history.append(message)
+
+
+def get_conversation_turn_count() -> int:
+    """Return the number of stored user and assistant turns in conversation history."""
+    return sum(
+        1
+        for message in st.session_state.conversation_history
+        if message.get("role") in {"user", "assistant"}
+    )
 
 
 def get_flat_technologies(tech_stack: dict[str, list[str]]) -> list[str]:
@@ -270,7 +287,11 @@ def generate_technical_questions(
 
     try:
         raw_response = service.generate_response(
-            build_technical_question_messages(technologies),
+            build_technical_question_messages(
+                technologies,
+                conversation_history=st.session_state.conversation_history,
+                candidate_data=st.session_state.candidate_data,
+            ),
             temperature=0.2,
             max_tokens=900,
         )
@@ -380,6 +401,7 @@ def render_sidebar(service: LLMService | None, service_error: str | None) -> Non
             f"Candidate fields collected: {get_collected_candidate_fields_count()}/{len(CANDIDATE_FIELDS)}"
         )
         st.caption(f"Technologies captured: {len(get_flat_technologies(st.session_state.tech_stack))}")
+        st.caption(f"Conversation turns stored: {get_conversation_turn_count()}")
 
         if st.button("Reset conversation", use_container_width=True):
             reset_conversation()
@@ -420,7 +442,7 @@ def main() -> None:
     if prompt is None:
         return
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    append_conversation_message("user", prompt)
 
     if service is None:
         assistant_response = (
@@ -437,7 +459,7 @@ def main() -> None:
                 f"server request failed. Please try again. Details: {exc}"
             )
 
-    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+    append_conversation_message("assistant", assistant_response)
     st.rerun()
 
 
