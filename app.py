@@ -43,6 +43,64 @@ TECH_STACK_FIELDS = (
     "databases",
     "tools_platforms",
 )
+LOW_SIGNAL_INPUTS = {
+    "hmm",
+    "hmmm",
+    "idk",
+    "i don't know",
+    "i dont know",
+    "na",
+    "n/a",
+    "none",
+    "not sure",
+    "ok",
+    "okay",
+    "skip",
+}
+ABUSIVE_TERMS = (
+    "asshole",
+    "bitch",
+    "dumb",
+    "fuck",
+    "fucking",
+    "idiot",
+    "moron",
+    "shut up",
+    "stupid",
+)
+UNRELATED_KEYWORDS = (
+    "bitcoin",
+    "capital of",
+    "celebrity",
+    "cricket",
+    "crypto",
+    "football",
+    "joke",
+    "movie",
+    "music",
+    "news",
+    "president",
+    "prime minister",
+    "recipe",
+    "song",
+    "sports",
+    "stock market",
+    "tell me a joke",
+    "time now",
+    "translate",
+    "weather",
+)
+GENERAL_QUERY_PREFIXES = (
+    "can you explain",
+    "how do i",
+    "how to",
+    "tell me about",
+    "what is",
+    "when is",
+    "where is",
+    "who is",
+    "why is",
+)
 EXIT_KEYWORDS = ("exit", "quit", "bye", "thanks", "thank you")
 STAGE_LABELS = {
     INITIAL_CONVERSATION_STAGE: "Greeting",
@@ -130,6 +188,40 @@ def is_exit_intent(text: str) -> bool:
     """Return True when the user is trying to end the conversation."""
     normalized = normalize_user_text(text).lower()
     return normalized in EXIT_KEYWORDS
+
+
+def is_low_signal_input(text: str) -> bool:
+    """Return True when the input is too vague to be useful."""
+    normalized = normalize_user_text(text).lower()
+    return normalized in LOW_SIGNAL_INPUTS
+
+
+def is_abusive_input(text: str) -> bool:
+    """Return True when the input contains abusive or hostile language."""
+    normalized = normalize_user_text(text).lower()
+    return any(term in normalized for term in ABUSIVE_TERMS)
+
+
+def is_unrelated_input(text: str) -> bool:
+    """Return True when the input is clearly unrelated to the hiring flow."""
+    normalized = normalize_user_text(text).lower()
+    if any(keyword in normalized for keyword in UNRELATED_KEYWORDS):
+        return True
+
+    if "?" in normalized and normalized.startswith(GENERAL_QUERY_PREFIXES):
+        return True
+
+    return False
+
+
+def should_return_fallback_response(text: str) -> bool:
+    """Return True when the fallback response should be used."""
+    return (
+        not text
+        or is_low_signal_input(text)
+        or is_abusive_input(text)
+        or is_unrelated_input(text)
+    )
 
 
 def get_stage_label(stage: str) -> str:
@@ -368,7 +460,7 @@ def process_user_message(user_message: str, service: LLMService) -> str:
     """Process a user message according to the staged conversation flow."""
     cleaned_message = normalize_user_text(user_message)
 
-    if not cleaned_message:
+    if should_return_fallback_response(cleaned_message):
         return FALLBACK_RESPONSE
 
     if is_exit_intent(cleaned_message):
