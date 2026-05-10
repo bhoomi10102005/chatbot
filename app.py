@@ -10,6 +10,7 @@ import streamlit as st
 from prompts.system_prompt import EXIT_RESPONSE, FALLBACK_RESPONSE
 from services.candidate_service import CandidateService
 from services.llm_service import LLMService
+from services.validation_service import validate_candidate_field
 
 APP_TITLE = "TalentScout Hiring Assistant"
 APP_SUBTITLE = "AI-powered candidate screening and technical evaluation"
@@ -353,13 +354,17 @@ def process_candidate_field_input(user_message: str) -> str:
     """Store candidate details for the current stage and return the next assistant prompt."""
     current_stage = st.session_state.conversation_stage
     field_name = FIELD_BY_STAGE[current_stage]
-    st.session_state.candidate_data[field_name] = user_message
+    validation_result = validate_candidate_field(field_name, user_message)
+    if not validation_result.is_valid:
+        return validation_result.error_message
+
+    st.session_state.candidate_data[field_name] = validation_result.normalized_value
 
     next_stage = NEXT_STAGE_BY_STAGE[current_stage]
     st.session_state.conversation_stage = next_stage
 
     if current_stage == INITIAL_CONVERSATION_STAGE:
-        first_name = user_message.split()[0]
+        first_name = validation_result.normalized_value.split()[0]
         return f"Nice to meet you, {first_name}. {get_next_stage_prompt(next_stage)}"
 
     return get_next_stage_prompt(next_stage)
