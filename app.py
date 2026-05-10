@@ -7,7 +7,14 @@ import re
 
 import streamlit as st
 
+from prompts.info_prompt import (
+    get_chat_input_placeholder as get_stage_input_placeholder,
+    get_first_name_acknowledgement,
+    get_next_stage_prompt,
+    get_welcome_message,
+)
 from prompts.system_prompt import EXIT_RESPONSE, FALLBACK_RESPONSE
+from prompts.technical_prompt import build_technical_question_messages
 from services.candidate_service import CandidateService
 from services.llm_service import LLMService
 from services.validation_service import validate_candidate_field
@@ -70,8 +77,7 @@ CATEGORY_ALIASES = {
     "tools_platforms": ("tools/platforms", "tools", "platforms", "tool", "platform"),
 }
 WELCOME_MESSAGE = (
-    "Welcome to TalentScout. I will guide you through a short screening conversation "
-    "and collect one detail at a time. To get started, please share your full name."
+    get_welcome_message()
 )
 
 
@@ -201,63 +207,7 @@ def parse_tech_stack_input(user_input: str) -> dict[str, list[str]]:
 
 def get_chat_input_placeholder() -> str:
     """Return a stage-aware placeholder for the chat input."""
-    stage = st.session_state.conversation_stage
-    placeholders = {
-        INITIAL_CONVERSATION_STAGE: "Enter your full name",
-        EMAIL_COLLECTION_STAGE: "Enter your email address",
-        PHONE_COLLECTION_STAGE: "Enter your phone number",
-        EXPERIENCE_COLLECTION_STAGE: "Enter your years of experience",
-        ROLE_COLLECTION_STAGE: "Enter your desired role",
-        LOCATION_COLLECTION_STAGE: "Enter your current location",
-        TECH_STACK_COLLECTION_STAGE: (
-            "Example: Languages: Python, JavaScript; Frameworks: Flask; "
-            "Databases: PostgreSQL; Tools/Platforms: Docker"
-        ),
-        COMPLETED_CONVERSATION_STAGE: "Conversation complete. Reset to start again.",
-    }
-    return placeholders.get(stage, "Share your response here")
-
-
-def get_next_stage_prompt(next_stage: str) -> str:
-    """Return the next assistant prompt for the conversation flow."""
-    prompts = {
-        EMAIL_COLLECTION_STAGE: "Could you please share your email address?",
-        PHONE_COLLECTION_STAGE: "Great. What is the best phone number to reach you?",
-        EXPERIENCE_COLLECTION_STAGE: "How many years of professional experience do you have?",
-        ROLE_COLLECTION_STAGE: "Which role are you currently targeting or applying for?",
-        LOCATION_COLLECTION_STAGE: "What is your current location?",
-        TECH_STACK_COLLECTION_STAGE: (
-            "Please share your tech stack, including programming languages, frameworks, "
-            "databases, and tools or platforms. You can use a format like: "
-            "Languages: Python, JavaScript; Frameworks: Flask; Databases: PostgreSQL; "
-            "Tools/Platforms: Docker."
-        ),
-    }
-    return prompts[next_stage]
-
-
-def get_question_generation_messages(technologies: list[str]) -> list[dict[str, str]]:
-    """Build the LM Studio prompt used to generate technical interview questions."""
-    technology_list = ", ".join(technologies)
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are a technical interviewer. Return valid JSON only. "
-                "Each top-level key must be a technology name and each value must be "
-                "an array of exactly 3 concise, practical, intermediate-level interview questions."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Candidate technologies: {technology_list}\n"
-                "Generate 3 unique interview questions for each technology.\n"
-                "Return JSON only in this format:\n"
-                '{"Python": ["Question 1?", "Question 2?", "Question 3?"]}'
-            ),
-        },
-    ]
+    return get_stage_input_placeholder(st.session_state.conversation_stage)
 
 
 def extract_json_object(raw_response: str) -> dict[str, object]:
@@ -320,7 +270,7 @@ def generate_technical_questions(
 
     try:
         raw_response = service.generate_response(
-            get_question_generation_messages(technologies),
+            build_technical_question_messages(technologies),
             temperature=0.2,
             max_tokens=900,
         )
@@ -365,7 +315,7 @@ def process_candidate_field_input(user_message: str) -> str:
 
     if current_stage == INITIAL_CONVERSATION_STAGE:
         first_name = validation_result.normalized_value.split()[0]
-        return f"Nice to meet you, {first_name}. {get_next_stage_prompt(next_stage)}"
+        return f"{get_first_name_acknowledgement(first_name)} {get_next_stage_prompt(next_stage)}"
 
     return get_next_stage_prompt(next_stage)
 
