@@ -29,6 +29,7 @@ ROLE_COLLECTION_STAGE = "collect_desired_role"
 LOCATION_COLLECTION_STAGE = "collect_current_location"
 TECH_STACK_COLLECTION_STAGE = "collect_tech_stack"
 COMPLETED_CONVERSATION_STAGE = "completed"
+COMPLETED_CONVERSATION_NOTICE = "Conversation closed. Use Reset conversation to start again."
 CANDIDATE_FIELDS = (
     "full_name",
     "email",
@@ -184,9 +185,16 @@ def normalize_user_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def normalize_intent_text(text: str) -> str:
+    """Normalize text for intent matching by removing punctuation noise."""
+    normalized = normalize_user_text(text).lower()
+    normalized = re.sub(r"[^\w\s]", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
 def is_exit_intent(text: str) -> bool:
     """Return True when the user is trying to end the conversation."""
-    normalized = normalize_user_text(text).lower()
+    normalized = normalize_intent_text(text)
     return normalized in EXIT_KEYWORDS
 
 
@@ -494,6 +502,8 @@ def render_sidebar(service: LLMService | None, service_error: str | None) -> Non
         )
         st.caption(f"Technologies captured: {len(get_flat_technologies(st.session_state.tech_stack))}")
         st.caption(f"Conversation turns stored: {get_conversation_turn_count()}")
+        if st.session_state.conversation_stage == COMPLETED_CONVERSATION_STAGE:
+            st.info(COMPLETED_CONVERSATION_NOTICE)
 
         if st.button("Reset conversation", use_container_width=True):
             reset_conversation()
