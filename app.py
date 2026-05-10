@@ -8,6 +8,7 @@ import re
 import streamlit as st
 
 from prompts.system_prompt import EXIT_RESPONSE, FALLBACK_RESPONSE
+from services.candidate_service import CandidateService
 from services.llm_service import LLMService
 
 APP_TITLE = "TalentScout Hiring Assistant"
@@ -377,6 +378,11 @@ def process_tech_stack_input(user_message: str, service: LLMService) -> str:
 
     st.session_state.tech_stack = parsed_tech_stack
     st.session_state.generated_questions = generate_technical_questions(service, technologies)
+    CandidateService().store_candidate(
+        st.session_state.candidate_data,
+        st.session_state.tech_stack,
+        st.session_state.generated_questions,
+    )
     st.session_state.conversation_stage = COMPLETED_CONVERSATION_STAGE
 
     return format_technical_questions_response(st.session_state.generated_questions)
